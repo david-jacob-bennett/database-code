@@ -1,11 +1,18 @@
+print("script started")
 import pandas as pd
 import sqlite3
 from sqlalchemy import create_engine
 import re
 
+# can maybe implement this somewhere. I think for the most part I need to make my regex better.
+def extract_pH(condition_text):
+    if not condition_text:
+        return None
+    match = re.search(r'pH\s+([\d.]+)', str(condition_text))
+    return match.group(1) if match else None
+
 def find_pH():
     pH_map = {}
-
     # extracting the conditions that have a pH associated with them and then creating a map with the name as the key and just the pH as the value
     conn_pH_reference = sqlite3.connect('2Trig/CrystalDex.db')
     conditions_df = pd.read_sql_query("SELECT DISTINCT condition FROM conditions", conn_pH_reference)
@@ -41,53 +48,60 @@ def find_pH():
     # if the condition in the database is equal to a condition in the map then make the pH column equal to the corresponding value in the map.
     engine = create_engine('sqlite:///data.db')
     df = pd.read_sql("SELECT * FROM data_table", engine)
-    # Currently I am finding direct matches. I need to make it so that I can just match the condition and pH from the crystal condition to the key
     
-    
+    '''Still non-functional. My algorithm for finding pH still only finds a small portion of the pH values. Not exactly sure of the cause of this other 
+    than I may have currated the search algorithm to the final file that we use.'''
 
     # Variables for below.
-    cc_unknown_pH = '' #crystal condition
+    cc_unknown_pH = '' #cc = crystal condition
     cc_known_pH = ''
     well_known_pH = ''
     well_unknown_pH = ''
     pH = 0
-    print(df['crystalcond'][500:550])
-    unkown_pH_conditions = df['crystalcond']
-    # Basically I am going through the crystal conditions in the dataframe and pulling out the raw condition and the well. Getting rid of other junk
-    # Not working at the moment because I need to parse through more than two values and find the well and condition. This is a problem for me on Monday.
-    for value in unkown_pH_conditions:
-        n1, n2 = value.split() # need to refactor this because there are going to be conditions that include spaces in them, leading to more than two values in the split
-        if len(n1) > 3:
-            cc_unknown_pH = n1
-            well_unknown_pH = n2
-        else:
-            cc_unknown_pH = n2
-            well_unknown_pH = n1
+    n = 0
     
+    unkown_pH_conditions = df['crystalcond'].values.tolist()
+    # Basically I am going through the crystal conditions in the dataframe and pulling out the raw condition and the well. Getting rid of other junk
+    for line in unkown_pH_conditions:
+        history = []
+        line = str(line)
+        if len(line) < 2: continue
+        line = line.split()
+        for i in range(len(line)):
+            # current_item = line[i]
+            # next_item = line[i+1]
+            history.append(line[i])
+        for value in history:
+            if re.match(r"[A-Z]\d{1,2}", value):
+                well_unknown_pH = value
+                history.remove(value)
+        cc_unknown_pH = ' '.join(history)
+        print(cc_unknown_pH)
     # for each key and value in the pH_map I am extracting the well number and condition and comparing these to the wells and conditions in the database where we don't know the pH
     # Then when we find a match we assign the database value that pH.
-    # Perhaps also refactor to see if we can get rid of the tripple for loop.
-    for entry in pH_map:
-        for key, val in entry.items():
-            num = 0
+        
+        for key, val in pH_map.items():
+            row = 0
             key_split = key.split()
-            while key.split != r"[A-Z]\d{1,2}\s":
-                num += 1
-            cc_known_pH = key_split[n]
-            well_known_pH = key_split[n+1]
-            pH = val
-        if well_known_pH == well_unknown_pH and cc_known_pH == cc_unknown_pH:
-            df['pH'] = pH
-
+            if well_unknown_pH == key_split[0]:
+                cc_known_pH = ' '.join(key_split[1:])
+                if cc_unknown_pH in cc_known_pH:
+                   df.iat[row, df.columns.get_loc('pH')] = val
+            if well_unknown_pH == key_split[1]:
+                cc_known_pH = ' '.join(key_split[2:])
+                if cc_unknown_pH in cc_known_pH:
+                   df.iat[row, df.columns.get_loc('pH')] = val
+            row += 1
     df.to_sql('data_table', engine, if_exists='replace', index=False) #perhaps no the best way to do this. It overwrites the table everytime but for now I tbink it should work
 
-        
-
-        
-
     conn_pH_reference.close()
+
 def main():
     find_pH()
 
 if __name__ == "__main__":
     main()
+
+"""At the moment it has a bug that is making it try to access the database within 2Trig rather than within benne77
+    folder so it is erroring out there. Need to figure out why it is doing this since it was working prior and I didn't 
+    change anything that I thought would have affected this."""

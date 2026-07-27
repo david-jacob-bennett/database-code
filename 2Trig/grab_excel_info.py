@@ -120,13 +120,13 @@ def main():
         '2Trig/22.1_Cassette_SSRL00154_Brown_13May2026_BL12-2 (1).xlsx': 22.1,
         '2Trig/23_Cassette_SSRL00154_Brown_06July2026.xlsx': 23
                         }
-    try:
-        if len(sys.argv) == 2:
-            run_batch(files_to_process, argv[1])
-        elif len(sys.argv) == 4:
-            load_data(argv[1], argv[2], argv[3])
-    except TypeError as e:
-        print("Incorrect amount of arguments were given. Must provide one or three arguments.")
+
+    if len(sys.argv) == 2:
+        run_batch(files_to_process, argv[1])
+    elif len(sys.argv) == 4:
+        load_data(argv[1], argv[2], argv[3])
+    else:
+        print("incorrect ammount of arguments. Make sure either one or three arguments besides the file name were included.")
 if __name__ == "__main__":
     main()
 

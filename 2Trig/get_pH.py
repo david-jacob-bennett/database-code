@@ -49,7 +49,7 @@ def find_pH():
     # print(pH_map)
     updated_pH_map = {}
 
-    #in progress. Not really currently working. 
+    #in progress. Not really currently working. Working on a simplified pH map.
     for key, val in pH_map.items():
         # Find the matching condition
         new_key = key  # Default to the old key if no match is found
@@ -59,10 +59,10 @@ def find_pH():
             if len(conditions_key) >= idx:
                 # print(f"{condition_reference} :::::: {conditions_key[idx]}")
                 if condition_reference - 1 == idx:
-                    if re.match(r"[A-Z]\d{1,2}", key):
+                    well = re.findall(r"[A-Z]\d{1,2}", key)
                     #also need to compare the well and connect that. Havent figured it out yet. 
-                        new_key = str(condition)
-                        break  # Stop searching once a match is found
+                    new_key = str(f"{condition} {well[0]}")
+                    
                 
         # Store with the new key
         updated_pH_map[new_key] = val
@@ -90,11 +90,6 @@ def find_pH():
     engine = create_engine('sqlite:////home/benne77/data.db')
     df = pd.read_sql("SELECT * FROM data_table", engine)
 
-    
-    
-    '''Still non-functional. My algorithm for finding pH still only finds a small portion of the pH values. Not exactly sure of the cause of this other 
-    than I may have currated the search algorithm to the final file that we use.'''
-
     # Variables for below.
     cc_unknown_pH = '' #cc = crystal condition
     cc_known_pH = ''
@@ -102,11 +97,11 @@ def find_pH():
     well_unknown_pH = ''
     pH = 0
     n = 0
-    
-    unkown_pH_conditions = df['crystalcond'].values.tolist()
+    num_found = 0
+    unknown_pH_conditions = df['crystalcond'].values.tolist()
     # Basically I am going through the crystal conditions in the dataframe and pulling out the raw condition and the well. Getting rid of other junk
     row = 0
-    for line in unkown_pH_conditions:
+    for line in unknown_pH_conditions:
         history = []
         line = str(line)
         if len(line) < 2: continue
@@ -131,35 +126,28 @@ def find_pH():
     # Then we can find the cc easily, find the well, and then map to a pH   
         for key, val in pH_map.items():
             key_split = key.split()
-
             # if the well is the first thing in the list.
-            if well_unknown_pH == key_split[0]:
-                num_found = 0
 
-                # This is a good start. We are matching some conditions. Need to make sure they are matching correctly and need to figure out how to match the ones where the formatting is not good.
-                
-                for cc_pH_map in key_split[1:]:
-                    if cc_pH_map.lower() in cc_unknown_pH.lower() or cc_unknown_pH.lower() in cc_pH_map.lower(): #Thinking that this is why about 1000 of the conditions are not matching.
-                        num_found += 1
+            if len(key_split) == 2 and well_unknown_pH in key_split[1]:
+                num_found = 1
+                if key_split[1] in cc_unknown_pH:
+                    num_found = 2 
                 if num_found >= 2: 
                     df.iat[row, df.columns.get_loc('pH')] = val
-
-            # if the well is the second thing in the list rather than the first.
-            if well_unknown_pH == key_split[1]:
-                num_found = 0
-
-                
-                for cc_pH_map in key_split[1:]:
-                    if cc_pH_map.lower() in cc_unknown_pH.lower() or cc_unknown_pH.lower() in cc_pH_map.lower(): #Thinking that this is why about 1000 of the conditions are not matching.
-                        num_found += 1
+            if len(key_split) == 3 and well_unknown_pH in key_split[2]:
+                num_found = 1
+                tray_type = f"{key_split[0]} {key_split[1]}"
+                if tray_type in cc_unknown_pH:
+                    num_found = 2
                 if num_found >= 2: 
-                    df.iat[row, df.columns.get_loc('pH')] = val 
+                    df.iat[row, df.columns.get_loc('pH')] = val
+                # Concatinate the first two parts and look for it in the unknown_cc
+
         
         row += 1
 
 
     # Reworking that last section. Can look up the crystal condition via corresponding number.
-
 
     # print(unkown_pH_conditions)
     df.to_sql('data_table', engine, if_exists='replace', index=False) #perhaps no the best way to do this. It overwrites the table everytime but for now I tbink it should work

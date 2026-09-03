@@ -97,7 +97,7 @@ def build_pH_map():
         updated_pH_map[key] = val
         updated_pH_map['Xtal'] = val
         # Store with the new key
-        
+    updated_pH_map['Storage buffer'] = '9.3'
         
     # Moving to original variable
     pH_map = updated_pH_map
@@ -165,7 +165,8 @@ def match_pH():
         for key, val in pH_map.items():
             key_split = key.split()
             # if the well is the first thing in the list.
-
+            if key == 'Storage buffer' and cc_unknown_pH.lower() == 'storage buffer':
+                df.iat[row, df.columns.get_loc('pH')] = val
             if len(key_split) == 2 and well_unknown_pH in key_split[1]:
                 num_found = 1
                 if key_split[1].lower() in cc_unknown_pH.lower():
@@ -182,7 +183,7 @@ def match_pH():
                 # Concatinate the first two parts and look for it in the unknown_cc
         current_ph_val = df.iat[row, df.columns.get_loc('pH')]
         if pd.isna(current_ph_val) or current_ph_val == matched_before:
-            cleaned = original_line.lower().strip()
+            cleaned = original_line.lower().strip().replace("_", " ")
             well_match = re.search(r'\b([a-l]\d{1,2})\b', cleaned)
             if well_match:
                 w = well_match.group(1).upper()
@@ -211,5 +212,4 @@ if __name__ == "__main__":
 
 
 '''Need to work on the following:
-1. Variations in crystal condition names.
-2. Innaccurate pH matching.'''
+1. Storage buffer is not matching'''

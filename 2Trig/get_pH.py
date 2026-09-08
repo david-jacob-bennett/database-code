@@ -47,11 +47,11 @@ def build_pH_map():
     pH_map = {} # crystal condition : pH value
         #need to adjust crystal screen later because it is also sometimes referred to as 'xtal'
     conditions_key = {
-        0: 'crystal screen',
-        1: 'index',
-        2: 'peg ion',
-        3: 'salt rx',
-        4: 'wizard screen'
+        1: 'crystal screen',
+        2: 'index',
+        3: 'peg ion',
+        4: 'salt rx',
+        5: 'wizard screen'
     }
     # extracting the conditions that have a pH associated with them and then creating a map with the name as the key and just the pH as the value
     conn_pH_reference = sqlite3.connect('/home/benne77/2Trig/CrystalDex.db')
@@ -65,10 +65,11 @@ def build_pH_map():
     
     # grabbing the pH value from each entry for the map
     n = 0
+
     for condition in condition_with_pH_val:
         condition_split = condition.split()
         for value in condition_split:
-            if value == 'pH':
+            if value == 'pH' and condition_split[n-1] == 'Average':
                 pH_map[condition] = condition_split[n+1]
             n += 1
         n = 0
@@ -131,13 +132,10 @@ def match_pH():
     pH_map = build_pH_map()
     df, engine = connect_to_database()
 
-    
-
     # Variables for below.
-    cc_unknown_pH = '' #cc = crystal condition
+     #cc = crystal condition
     cc_known_pH = ''
     well_known_pH = ''
-    well_unknown_pH = ''
     pH = 0
     n = 0
     num_found = 0
@@ -145,6 +143,8 @@ def match_pH():
     # Basically I am going through the crystal conditions in the dataframe and pulling out the raw condition and the well. Getting rid of other junk
     row = 0
     for line in unknown_pH_conditions:
+        cc_unknown_pH = ''
+        well_unknown_pH = ''
         history = []
         line = str(line)
         if len(line) < 2: continue
@@ -167,12 +167,24 @@ def match_pH():
             # if the well is the first thing in the list.
             if key == 'Storage buffer' and cc_unknown_pH.lower() == 'storage buffer':
                 df.iat[row, df.columns.get_loc('pH')] = val
+                break
+
             if len(key_split) == 2 and well_unknown_pH in key_split[1]:
+                num_found = 1
+                if key_split[0].lower() in cc_unknown_pH.lower():
+                    num_found = 2 
+                if num_found >= 2: 
+                    df.iat[row, df.columns.get_loc('pH')] = val
+                    break
+
+            if len(key_split) == 2 and well_unknown_pH in key_split[0]:
                 num_found = 1
                 if key_split[1].lower() in cc_unknown_pH.lower():
                     num_found = 2 
                 if num_found >= 2: 
                     df.iat[row, df.columns.get_loc('pH')] = val
+                    break
+
             if len(key_split) == 3 and well_unknown_pH in key_split[2]:
                 num_found = 1
                 tray_type = f"{key_split[0]} {key_split[1]}"
@@ -180,6 +192,7 @@ def match_pH():
                     num_found = 2
                 if num_found >= 2: 
                     df.iat[row, df.columns.get_loc('pH')] = val
+                    break
                 # Concatinate the first two parts and look for it in the unknown_cc
         current_ph_val = df.iat[row, df.columns.get_loc('pH')]
         if pd.isna(current_ph_val) or current_ph_val == matched_before:
@@ -197,7 +210,7 @@ def match_pH():
                 if fallback_key in pH_map:
                     df.iat[row, df.columns.get_loc('pH')] = pH_map[fallback_key]
         row += 1
-
+        print(cc_unknown_pH)
     # Reworking that last section. Can look up the crystal condition via corresponding number.
 
     df.to_sql('data_table', engine, if_exists='replace', index=False) 
